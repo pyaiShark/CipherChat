@@ -23,6 +23,14 @@ export default defineSchema({
         senderId: v.id("users"),
         content: v.string(),
         isDeleted: v.optional(v.boolean()),
+        reactions: v.optional(
+            v.array(
+                v.object({
+                    emoji: v.string(),
+                    users: v.array(v.id("users")),
+                })
+            )
+        ),
     }).index("by_conversationId", ["conversationId"]),
 
     typingIndicators: defineTable({

@@ -19,6 +19,8 @@ import { Input } from "@shadcn-ui/input";
 import { Button } from "@shadcn-ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@shadcn-ui/avatar";
 
+const EMOJIS = ["👍", "❤️", "😂", "😮", "😢"];
+
 export function ChatArea({
     conversationId,
     onBack,
@@ -27,9 +29,11 @@ export function ChatArea({
     onBack: () => void;
 }) {
     const [newMessage, setNewMessage] = useState("");
+    const [reactionsPopupMessageId, setReactionsPopupMessageId] = useState<Id<"messages"> | null>(null);
     const messages = useQuery(api.messages.getMessages, { conversationId });
     const sendMessage = useMutation(api.messages.sendMessage);
     const deleteMessage = useMutation(api.messages.deleteMessage);
+    const toggleReaction = useMutation(api.messages.toggleReaction);
     const currentUser = useQuery(api.users.getCurrentUser);
     const markAsRead = useMutation(api.conversations.markAsRead);
     const conversations = useQuery(api.conversations.getConversations);
@@ -115,6 +119,15 @@ export function ChatArea({
             await sendMessage({ conversationId, content });
         } catch (error) {
             console.error("Failed to send message", error);
+        }
+    };
+
+    const handleReaction = async (messageId: Id<"messages">, emoji: string) => {
+        try {
+            await toggleReaction({ messageId, emoji });
+            setReactionsPopupMessageId(null);
+        } catch (error) {
+            console.error("Failed to toggle reaction", error);
         }
     };
 
@@ -219,6 +232,50 @@ export function ChatArea({
                                                     {formatMessageTimestamp(msg._creationTime)}
                                                 </span>
                                             </div>
+
+                                            {/* Display Reactions */}
+                                            {msg.reactions && msg.reactions.length > 0 && (
+                                                <div className={`flex flex-wrap gap-1 mt-0.5 ${isOwn ? "justify-end" : "justify-start"}`}>
+                                                    {msg.reactions.map(r => {
+                                                        const userHasReacted = currentUser && r.users.includes(currentUser._id);
+                                                        return (
+                                                            <button
+                                                                key={r.emoji}
+                                                                onClick={() => handleReaction(msg._id, r.emoji)}
+                                                                className={`flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded-full border shadow-sm transition-colors ${userHasReacted ? 'bg-[var(--wa-green-light)]/20 border-[var(--wa-green-light)]/30 text-[var(--wa-text-primary)]' : 'bg-[var(--wa-header)]/80 border-white/10 hover:bg-[var(--wa-hover)] text-[var(--wa-text-secondary)]'}`}
+                                                            >
+                                                                <span>{r.emoji}</span>
+                                                                {r.users.length > 1 && <span className="opacity-80 font-medium">{r.users.length}</span>}
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
+
+                                            {/* Add Reaction Button */}
+                                            <button
+                                                onClick={() => setReactionsPopupMessageId(reactionsPopupMessageId === msg._id ? null : msg._id)}
+                                                className={`absolute -top-3 ${isOwn ? 'right-6' : '-right-3'} w-7 h-7 bg-[var(--wa-header)] rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 shadow-md border hover:bg-[var(--wa-hover)] border-white/10 z-10`}
+                                            >
+                                                <Smile className="w-4 h-4 text-[var(--wa-text-light)] relative top-[1px]" />
+                                            </button>
+
+                                            {/* Reaction Picker Popup */}
+                                            {reactionsPopupMessageId === msg._id && (
+                                                <div className={`absolute top-full mt-2 ${isOwn ? 'right-0' : 'left-0'} bg-[var(--wa-header)] rounded-full px-3 py-2 shadow-xl border border-white/10 flex items-center gap-2 z-20 animate-fade-in-up duration-200`}
+                                                    onMouseLeave={() => setReactionsPopupMessageId(null)}
+                                                >
+                                                    {EMOJIS.map(emoji => (
+                                                        <button
+                                                            key={emoji}
+                                                            onClick={() => handleReaction(msg._id, emoji)}
+                                                            className="text-2xl hover:scale-125 hover:-translate-y-1 transition-all duration-200 cursor-pointer"
+                                                        >
+                                                            {emoji}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
 
                                             {/* Delete button */}
                                             {isOwn && (

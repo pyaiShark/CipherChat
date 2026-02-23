@@ -103,3 +103,58 @@ export const deleteMessage = mutation({
         });
     },
 });
+
+export const toggleReaction = mutation({
+    args: {
+        messageId: v.id("messages"),
+        emoji: v.string(),
+    },
+    handler: async (ctx, args) => {
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) throw new Error("Unauthorized");
+
+        const currentUser = await ctx.db
+            .query("users")
+            .withIndex("by_clerkId", (q) => q.eq("clerkId", identity.subject))
+            .unique();
+
+        if (!currentUser) throw new Error("User not found");
+
+        const message = await ctx.db.get(args.messageId);
+        if (!message) throw new Error("Message not found");
+
+        let currentReactions = message.reactions || [];
+
+        // Find if this emoji already has reactions
+        const existingEmojiIndex = currentReactions.findIndex(r => r.emoji === args.emoji);
+
+        if (existingEmojiIndex !== -1) {
+            // Emoji exists, check if user has reacted with it
+            const existingReaction = currentReactions[existingEmojiIndex];
+            const userIndex = existingReaction.users.findIndex(id => id === currentUser._id);
+
+            if (userIndex !== -1) {
+                // User has reacted with this emoji, so remove their reaction (toggle off)
+                existingReaction.users.splice(userIndex, 1);
+
+                // If no users left for this emoji, remove the emoji object entirely
+                if (existingReaction.users.length === 0) {
+                    currentReactions.splice(existingEmojiIndex, 1);
+                }
+            } else {
+                // User hasn't reacted with this emoji, add them
+                existingReaction.users.push(currentUser._id);
+            }
+        } else {
+            // First time this emoji is used on this message
+            currentReactions.push({
+                emoji: args.emoji,
+                users: [currentUser._id]
+            });
+        }
+
+        await ctx.db.patch(args.messageId, {
+            reactions: currentReactions
+        });
+    },
+});
