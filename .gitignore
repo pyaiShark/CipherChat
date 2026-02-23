@@ -45,3 +45,6 @@ next-env.d.ts
 !README.md
 *.pdf
 !next-env.d.ts
+
+# Ignore local editor configs
+.vscode
