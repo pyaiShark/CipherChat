@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 import { ConvexClientProvider } from "./ConvexClientProvider";
+import { Toaster } from "sonner";
 
 export const metadata: Metadata = {
   title: "CipherChat — Real-Time Messaging",
@@ -45,6 +46,7 @@ export default function RootLayout({
       </head>
       <body style={{ fontFamily: "'Inter', sans-serif" }}>
         <ConvexClientProvider>{children}</ConvexClientProvider>
+        <Toaster position="bottom-center" richColors theme="dark" />
       </body>
     </html>
   );

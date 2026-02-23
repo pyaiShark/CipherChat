@@ -18,6 +18,7 @@ import { formatMessageTimestamp } from "../lib/utils";
 import { Input } from "@shadcn-ui/input";
 import { Button } from "@shadcn-ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@shadcn-ui/avatar";
+import { toast } from "sonner";
 
 const EMOJIS = ["👍", "❤️", "😂", "😮", "😢"];
 
@@ -29,6 +30,7 @@ export function ChatArea({
     onBack: () => void;
 }) {
     const [newMessage, setNewMessage] = useState("");
+    const [isSending, setIsSending] = useState(false);
     const [reactionsPopupMessageId, setReactionsPopupMessageId] = useState<Id<"messages"> | null>(null);
     const [swipedMessageId, setSwipedMessageId] = useState<Id<"messages"> | null>(null);
     const touchStartXRef = useRef<number>(0);
@@ -106,9 +108,10 @@ export function ChatArea({
 
     const handleSend = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!newMessage.trim()) return;
+        if (!newMessage.trim() || isSending) return;
         const content = newMessage.trim();
         setNewMessage("");
+        setIsSending(true);
 
         // Mark that user is sending a message right now to force auto-scroll
         isSendingRef.current = true;
@@ -121,6 +124,11 @@ export function ChatArea({
             await sendMessage({ conversationId, content });
         } catch (error) {
             console.error("Failed to send message", error);
+            toast.error("Failed to send message. Please check your connection and try again.");
+            // Optionally restore the message text so user doesn't lose it
+            setNewMessage(content);
+        } finally {
+            setIsSending(false);
         }
     };
 
@@ -130,6 +138,17 @@ export function ChatArea({
             setReactionsPopupMessageId(null);
         } catch (error) {
             console.error("Failed to toggle reaction", error);
+            toast.error("Failed to add reaction.");
+        }
+    };
+
+    const handleDeleteMessage = async (messageId: Id<"messages">) => {
+        try {
+            await deleteMessage({ messageId });
+            setSwipedMessageId(null);
+        } catch (error) {
+            console.error("Failed to delete message", error);
+            toast.error("Failed to delete message.");
         }
     };
 
@@ -218,8 +237,7 @@ export function ChatArea({
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        deleteMessage({ messageId: msg._id });
-                                                        setSwipedMessageId(null);
+                                                        handleDeleteMessage(msg._id);
                                                     }}
                                                     className={`absolute left-0 w-8 h-8 bg-[var(--wa-danger)] rounded-full flex md:hidden items-center justify-center shadow-md transition-all duration-200 z-0 ${swipedMessageId === msg._id ? 'opacity-100 scale-100' : 'opacity-0 scale-50'}`}
                                                 >
@@ -330,7 +348,7 @@ export function ChatArea({
                                                     <button
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            deleteMessage({ messageId: msg._id });
+                                                            handleDeleteMessage(msg._id);
                                                         }}
                                                         className="absolute -top-2 -right-2 w-6 h-6 bg-[var(--wa-header)] rounded-full hidden md:flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 hover:bg-[var(--wa-danger)] shadow-md"
                                                     >
@@ -410,13 +428,14 @@ export function ChatArea({
                     </div>
 
                     {/* Send / Mic */}
-                    {newMessage.trim() ? (
+                    {newMessage.trim() || isSending ? (
                         <Button
                             type="submit"
                             size="icon"
-                            className="w-10 h-10 bg-[var(--wa-green)] rounded-full text-white hover:bg-[var(--wa-green-dark)] active:scale-95 shrink-0"
+                            disabled={isSending}
+                            className="w-10 h-10 bg-[var(--wa-green)] rounded-full text-white hover:bg-[var(--wa-green-dark)] active:scale-95 shrink-0 disabled:opacity-70"
                         >
-                            <Send className="w-5 h-5 ml-0.5" />
+                            {isSending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5 ml-0.5" />}
                         </Button>
                     ) : (
                         <Button
