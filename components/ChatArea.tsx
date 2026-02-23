@@ -1,0 +1,328 @@
+"use client";
+
+import { useState, useRef, useEffect } from "react";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "../convex/_generated/api";
+import { Id } from "../convex/_generated/dataModel";
+import {
+    Send,
+    ArrowLeft,
+    Loader2,
+    ChevronDown,
+    Trash2,
+    Smile,
+    Paperclip,
+    Mic,
+} from "lucide-react";
+import { formatMessageTimestamp } from "../lib/utils";
+import { Input } from "@shadcn-ui/input";
+import { Button } from "@shadcn-ui/button";
+import { Avatar, AvatarImage, AvatarFallback } from "@shadcn-ui/avatar";
+
+export function ChatArea({
+    conversationId,
+    onBack,
+}: {
+    conversationId: Id<"conversations">;
+    onBack: () => void;
+}) {
+    const [newMessage, setNewMessage] = useState("");
+    const messages = useQuery(api.messages.getMessages, { conversationId });
+    const sendMessage = useMutation(api.messages.sendMessage);
+    const deleteMessage = useMutation(api.messages.deleteMessage);
+    const currentUser = useQuery(api.users.getCurrentUser);
+    const markAsRead = useMutation(api.conversations.markAsRead);
+    const conversations = useQuery(api.conversations.getConversations);
+
+    // Find the other user from conversations
+    const currentConv = conversations?.find((c) => c._id === conversationId);
+    const otherUser = currentConv?.otherUser;
+
+    // Typing indicators
+    const setTyping = useMutation(api.typing.setTyping);
+    const typingUsers = useQuery(api.typing.getTypingUsers, { conversationId });
+    const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+    const bottomRef = useRef<HTMLDivElement>(null);
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
+    const [showScrollButton, setShowScrollButton] = useState(false);
+
+    const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+        const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+        setShowScrollButton(scrollHeight - scrollTop - clientHeight > 150);
+    };
+
+    const handleTyping = (text: string) => {
+        setNewMessage(text);
+        if (!text.trim()) {
+            if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+            typingTimeoutRef.current = null;
+            setTyping({ conversationId, isTyping: false }).catch(console.error);
+            return;
+        }
+        if (!typingTimeoutRef.current) {
+            setTyping({ conversationId, isTyping: true }).catch(console.error);
+        } else {
+            clearTimeout(typingTimeoutRef.current);
+        }
+        typingTimeoutRef.current = setTimeout(() => {
+            setTyping({ conversationId, isTyping: false }).catch(console.error);
+            typingTimeoutRef.current = null;
+        }, 2000);
+    };
+
+    // Create a mutable ref to track if user just sent a message
+    const isSendingRef = useRef(false);
+
+    // Auto-scroll logic
+    useEffect(() => {
+        if (!messages || messages.length === 0) return;
+
+        const container = scrollContainerRef.current;
+        const bottom = bottomRef.current;
+        if (!container || !bottom) return;
+
+        // On initial load or new message, wait a tiny bit for React 
+        // to finish calculating DOM heights before jumping.
+        const timer = setTimeout(() => {
+            requestAnimationFrame(() => {
+                bottom.scrollIntoView({ behavior: "instant" });
+                isSendingRef.current = false;
+            });
+        }, 100);
+
+        if (conversationId) {
+            markAsRead({ conversationId }).catch(console.error);
+        }
+
+        return () => clearTimeout(timer);
+    }, [messages?.length, conversationId, markAsRead]);
+
+    const handleSend = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newMessage.trim()) return;
+        const content = newMessage.trim();
+        setNewMessage("");
+
+        // Mark that user is sending a message right now to force auto-scroll
+        isSendingRef.current = true;
+        if (typingTimeoutRef.current) {
+            clearTimeout(typingTimeoutRef.current);
+            typingTimeoutRef.current = null;
+        }
+        setTyping({ conversationId, isTyping: false }).catch(console.error);
+        try {
+            await sendMessage({ conversationId, content });
+        } catch (error) {
+            console.error("Failed to send message", error);
+        }
+    };
+
+    return (
+        <div className="flex flex-col h-full bg-[var(--wa-chat-bg)] relative">
+            {/* ── Header ── */}
+            <div className="flex items-center justify-between px-3 h-14 bg-[var(--wa-header)] shrink-0 z-10">
+                <div className="flex items-center gap-3 min-w-0">
+                    {/* Back button (mobile) */}
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={onBack}
+                        className="md:hidden p-1.5 -ml-1 rounded-lg text-[var(--wa-text-on-header)] hover:bg-white/10"
+                    >
+                        <ArrowLeft className="w-5 h-5" />
+                    </Button>
+
+                    {/* User avatar */}
+                    <Avatar className="w-10 h-10">
+                        {otherUser?.avatar ? (
+                            <AvatarImage src={otherUser.avatar} alt="" />
+                        ) : null}
+                        <AvatarFallback className="bg-[var(--wa-input-bg)] text-sm font-semibold text-[var(--wa-text-light)]">
+                            {otherUser?.name?.charAt(0).toUpperCase() || "C"}
+                        </AvatarFallback>
+                    </Avatar>
+
+                    {/* Name & status */}
+                    <div className="min-w-0">
+                        <p className="text-[15px] font-medium text-[var(--wa-text-on-header)] truncate">
+                            {otherUser?.name || "Conversation"}
+                        </p>
+                        {typingUsers && typingUsers.length > 0 ? (
+                            <p className="text-xs text-[var(--wa-green-light)] font-medium">typing...</p>
+                        ) : otherUser?.isOnline ? (
+                            <p className="text-xs text-[var(--wa-text-on-header)]/70">online</p>
+                        ) : (
+                            <p className="text-xs text-[var(--wa-text-on-header)]/70">offline</p>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            {/* ── Messages ── */}
+            <div
+                ref={scrollContainerRef}
+                onScroll={handleScroll}
+                className="flex-1 overflow-y-auto px-4 sm:px-12 md:px-16 py-3 wa-chat-bg wa-scrollbar relative"
+            >
+                {messages === undefined ? (
+                    <div className="flex h-full items-center justify-center">
+                        <Loader2 className="w-6 h-6 animate-spin text-[var(--wa-text-light)]/40" />
+                    </div>
+                ) : messages.length === 0 ? (
+                    <div className="flex h-full items-center justify-center">
+                        <div className="bg-[var(--wa-system-msg)] px-4 py-2 rounded-lg shadow-sm text-center max-w-[280px]">
+                            <p className="text-xs text-[var(--wa-text-secondary)] leading-relaxed">
+                                Messages are end-to-end encrypted. No one outside of this
+                                chat can read them. Say hi! 👋
+                            </p>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="space-y-1">
+                        {messages.map((msg, index) => {
+                            const isOwn = msg.senderId === currentUser?._id;
+                            const isFirstInGroup =
+                                index === 0 ||
+                                messages[index - 1].senderId !== msg.senderId;
+
+                            return (
+                                <div
+                                    key={msg._id}
+                                    className={`flex ${isOwn ? "justify-end" : "justify-start"} animate-fade-in-up`}
+                                    style={{ animationDuration: "0.2s" }}
+                                >
+                                    {msg.isDeleted ? (
+                                        <div className={`max-w-[65%] px-3 py-1.5 rounded-lg text-[var(--wa-text-light)] text-[13px] italic border border-[var(--wa-border)] my-0.5 ${isOwn ? "bg-[var(--wa-bubble-sent)]/50 text-[var(--wa-text-primary)]/70" : "bg-[var(--wa-bubble-received)]/50"}`}>
+                                            🚫 This message was deleted
+                                        </div>
+                                    ) : (
+                                        <div
+                                            className={`group relative max-w-[65%] px-3 pt-1.5 pb-1 rounded-lg shadow-sm my-[1px] ${isOwn
+                                                ? `bg-[var(--wa-bubble-sent)] text-[var(--wa-text-primary)] ${isFirstInGroup ? "bubble-tail-sent rounded-tr-none" : ""}`
+                                                : `bg-[var(--wa-bubble-received)] text-[var(--wa-text-primary)] ${isFirstInGroup ? "bubble-tail-received rounded-tl-none" : ""}`
+                                                }`}
+                                        >
+                                            {/* Sender name (for received, first in group) */}
+                                            {!isOwn && isFirstInGroup && (
+                                                <p className="text-[12.5px] font-semibold text-[var(--wa-green)] mb-0.5">
+                                                    {msg.senderName}
+                                                </p>
+                                            )}
+
+                                            {/* Message content + timestamp row */}
+                                            <div className="flex items-end gap-2">
+                                                <p className="text-[14.2px] break-words leading-[19px] flex-1">
+                                                    {msg.content}
+                                                </p>
+                                                <span className="text-[11px] shrink-0 self-end pb-[1px] text-[var(--wa-text-secondary)]">
+                                                    {formatMessageTimestamp(msg._creationTime)}
+                                                </span>
+                                            </div>
+
+                                            {/* Delete button */}
+                                            {isOwn && (
+                                                <button
+                                                    onClick={() =>
+                                                        deleteMessage({ messageId: msg._id })
+                                                    }
+                                                    className="absolute -top-2 -right-2 w-6 h-6 bg-[var(--wa-header)] rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 hover:bg-[var(--wa-danger)] shadow-md"
+                                                >
+                                                    <Trash2 className="w-3 h-3 text-white" />
+                                                </button>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+
+                {/* Typing indicator */}
+                {typingUsers && typingUsers.length > 0 && (
+                    <div className="flex justify-start mt-1">
+                        <div className="bg-[var(--wa-bubble-received)] px-4 py-2.5 rounded-lg shadow-sm bubble-tail-received rounded-tl-none flex items-center gap-2">
+                            <div className="flex gap-1">
+                                <span className="w-[7px] h-[7px] bg-[var(--wa-text-light)] rounded-full typing-dot" />
+                                <span className="w-[7px] h-[7px] bg-[var(--wa-text-light)] rounded-full typing-dot" />
+                                <span className="w-[7px] h-[7px] bg-[var(--wa-text-light)] rounded-full typing-dot" />
+                            </div>
+                        </div>
+                    </div>
+                )}
+                <div ref={bottomRef} />
+            </div>
+
+            {/* Scroll-to-bottom button */}
+            {showScrollButton && (
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() =>
+                        bottomRef.current?.scrollIntoView({ behavior: "smooth" })
+                    }
+                    className="absolute bottom-[72px] right-5 w-10 h-10 bg-[var(--wa-header)] rounded-full shadow-lg hover:bg-[var(--wa-hover)] z-20"
+                >
+                    <ChevronDown className="w-5 h-5 text-[var(--wa-text-light)]" />
+                </Button>
+            )}
+
+            {/* ── Input Area ── */}
+            <div className="px-3 py-2 bg-[var(--wa-sidebar-header)] shrink-0">
+                <form onSubmit={handleSend} className="flex items-end gap-2">
+                    {/* Emoji */}
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="w-10 h-10 shrink-0 rounded-full text-[var(--wa-text-light)] hover:text-[var(--wa-text-primary)] hover:bg-[var(--wa-hover)]"
+                    >
+                        <Smile className="w-6 h-6" />
+                    </Button>
+
+                    {/* Attachment */}
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="w-10 h-10 shrink-0 rounded-full text-[var(--wa-text-light)] hover:text-[var(--wa-text-primary)] hover:bg-[var(--wa-hover)]"
+                    >
+                        <Paperclip className="w-5 h-5 rotate-45" />
+                    </Button>
+
+                    {/* Text input */}
+                    <div className="flex-1 relative">
+                        <Input
+                            type="text"
+                            value={newMessage}
+                            onChange={(e) => handleTyping(e.target.value)}
+                            placeholder="Type a message"
+                            className="w-full h-[42px] px-4 text-[15px] bg-[var(--wa-input-bg)] text-[var(--wa-text-primary)] rounded-lg border-none shadow-none outline-none placeholder:text-[var(--wa-text-light)] focus-visible:ring-0 focus-visible:border-none"
+                        />
+                    </div>
+
+                    {/* Send / Mic */}
+                    {newMessage.trim() ? (
+                        <Button
+                            type="submit"
+                            size="icon"
+                            className="w-10 h-10 bg-[var(--wa-green)] rounded-full text-white hover:bg-[var(--wa-green-dark)] active:scale-95 shrink-0"
+                        >
+                            <Send className="w-5 h-5 ml-0.5" />
+                        </Button>
+                    ) : (
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="w-10 h-10 shrink-0 rounded-full text-[var(--wa-text-light)] hover:text-[var(--wa-text-primary)] hover:bg-[var(--wa-hover)]"
+                        >
+                            <Mic className="w-6 h-6" />
+                        </Button>
+                    )}
+                </form>
+            </div>
+        </div>
+    );
+}

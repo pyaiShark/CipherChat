@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="0 0 300 300" opacity="0.045">
+  <defs>
+    <style>
+      .p { fill: #0D1418; }
+    </style>
+  </defs>
+  <!-- Chat bubble -->
+  <path class="p" d="M30 20c-5.5 0-10 4.5-10 10v12c0 5.5 4.5 10 10 10h2l4 6 4-6h10c5.5 0 10-4.5 10-10V30c0-5.5-4.5-10-10-10H30z"/>
+  <!-- Phone -->
+  <rect class="p" x="80" y="15" width="16" height="30" rx="3"/>
+  <rect class="p" x="84" y="40" width="8" height="2" rx="1"/>
+  <!-- Smiley face -->
+  <circle class="p" cx="140" cy="35" r="14"/>
+  <circle cx="135" cy="31" r="2" fill="#ECE5DD"/>
+  <circle cx="145" cy="31" r="2" fill="#ECE5DD"/>
+  <path d="M133 37c0 4 3.1 7 7 7s7-3 7-7" stroke="#ECE5DD" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+  <!-- Camera -->
+  <rect class="p" x="180" y="25" width="24" height="18" rx="3"/>
+  <circle class="p" cx="192" cy="34" r="5"/>
+  <rect class="p" x="186" y="22" width="12" height="5" rx="1"/>
+  <!-- Music note -->
+  <circle class="p" cx="240" cy="42" r="5"/>
+  <rect class="p" x="244" y="22" width="2" height="20"/>
+  <path class="p" d="M244 22c4-2 10-1 10-6" stroke-width="2" fill="none" stroke="#0D1418" stroke-linecap="round"/>
+  <!-- Heart -->
+  <path class="p" d="M275 30c-2-6-10-6-12 0-2-6-10-6-12 0 0 7 12 16 12 16s12-9 12-16z"/>
+  <!-- Star -->
+  <polygon class="p" points="30,90 33,100 43,100 35,106 38,116 30,110 22,116 25,106 17,100 27,100"/>
+  <!-- Paperclip -->
+  <path d="M85 80v25c0 6 5 11 11 11s11-5 11-11V85c0-3.5-2.5-6-6-6s-6 2.5-6 6v18" stroke="#0D1418" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <!-- Clock -->
+  <circle cx="140" cy="100" r="12" stroke="#0D1418" stroke-width="2.5" fill="none"/>
+  <line x1="140" y1="100" x2="140" y2="92" stroke="#0D1418" stroke-width="2" stroke-linecap="round"/>
+  <line x1="140" y1="100" x2="147" y2="103" stroke="#0D1418" stroke-width="2" stroke-linecap="round"/>
+  <!-- Location pin -->
+  <path class="p" d="M192 85c-7 0-12 5.5-12 12 0 9 12 20 12 20s12-11 12-20c0-6.5-5-12-12-12z"/>
+  <circle cx="192" cy="97" r="4" fill="#ECE5DD"/>
+  <!-- Wifi -->
+  <path d="M230 105c6-6 18-6 24 0" stroke="#0D1418" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <path d="M234 110c4-4 12-4 16 0" stroke="#0D1418" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <path d="M238 115c2-2 8-2 10 0" stroke="#0D1418" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <circle class="p" cx="242" cy="119" r="2"/>
+  <!-- Key / Lock -->
+  <circle cx="280" cy="90" r="8" stroke="#0D1418" stroke-width="2.5" fill="none"/>
+  <rect class="p" x="277" y="97" width="6" height="10" rx="1"/>
+  <!-- Small chat bubble -->
+  <path class="p" d="M25 160c-4 0-7 3-7 7v8c0 4 3 7 7 7h1l3 4 3-4h7c4 0 7-3 7-7v-8c0-4-3-7-7-7H25z"/>
+  <!-- Headphones -->
+  <path d="M80 175c0-8 6-14 14-14s14 6 14 14" stroke="#0D1418" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <rect class="p" x="78" y="173" width="6" height="12" rx="3"/>
+  <rect class="p" x="104" y="173" width="6" height="12" rx="3"/>
+  <!-- Document -->
+  <rect class="p" x="132" y="155" width="18" height="24" rx="2"/>
+  <line x1="136" y1="163" x2="146" y2="163" stroke="#ECE5DD" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="136" y1="168" x2="146" y2="168" stroke="#ECE5DD" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="136" y1="173" x2="142" y2="173" stroke="#ECE5DD" stroke-width="1.5" stroke-linecap="round"/>
+  <!-- Video camera -->
+  <rect class="p" x="178" y="162" width="20" height="14" rx="3"/>
+  <polygon class="p" points="200,165 212,169 200,173"/>
+  <!-- Globe -->
+  <circle cx="245" cy="170" r="12" stroke="#0D1418" stroke-width="2" fill="none"/>
+  <ellipse cx="245" cy="170" rx="6" ry="12" stroke="#0D1418" stroke-width="1.5" fill="none"/>
+  <line x1="233" y1="170" x2="257" y2="170" stroke="#0D1418" stroke-width="1.5"/>
+  <!-- Microphone -->
+  <rect class="p" x="277" y="155" width="10" height="18" rx="5"/>
+  <path d="M273 172c0 7 6 13 13 13" stroke="#0D1418" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <line x1="282" y1="185" x2="282" y2="190" stroke="#0D1418" stroke-width="2" stroke-linecap="round"/>
+  <!-- Thumbs up -->
+  <path class="p" d="M25 240h8v18h-8zM33 244h12c2 0 3 1.5 2.5 3.5l-2 8c-.5 1.5-2 2.5-3.5 2.5h-9v-14z"/>
+  <!-- Image/Photo icon -->
+  <rect class="p" x="78" y="235" width="22" height="18" rx="3"/>
+  <circle cx="85" cy="242" r="3" fill="#ECE5DD"/>
+  <path d="M78 250l6-5 4 3 5-6 7 8" stroke="#ECE5DD" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Check marks (double tick) -->
+  <polyline points="130,248 136,256 150,240" stroke="#0D1418" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <polyline points="138,248 144,256 158,240" stroke="#0D1418" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Contact / User -->
+  <circle class="p" cx="195" cy="238" r="7"/>
+  <path class="p" d="M183 258c0-7 5.5-12 12-12s12 5 12 12"/>
+  <!-- Lightning -->
+  <polygon class="p" points="245,230 240,248 247,248 242,265 255,244 248,244 253,230"/>
+  <!-- Gift -->
+  <rect class="p" x="273" y="243" width="18" height="14" rx="2"/>
+  <rect class="p" x="271" y="238" width="22" height="7" rx="2"/>
+  <line x1="282" y1="238" x2="282" y2="257" stroke="#ECE5DD" stroke-width="1.5"/>
+</svg>

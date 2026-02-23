@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <!-- Background Gradient -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0F172A" />
+      <stop offset="100%" stop-color="#020617" />
+    </linearGradient>
+
+    <!-- Bubble Gradient (WhatsApp style cyan to green) -->
+    <linearGradient id="bubbleGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#10B981" /> <!-- Emerald Green -->
+      <stop offset="50%" stop-color="#059669" /> <!-- Darker Green -->
+      <stop offset="100%" stop-color="#0D9488" /> <!-- Teal -->
+    </linearGradient>
+    
+    <!-- Lock/Cipher Gradient -->
+    <linearGradient id="lockGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" />
+      <stop offset="100%" stop-color="#CBD5E1" />
+    </linearGradient>
+
+    <!-- Drop Shadow for the bubble -->
+    <filter id="shadow" x="-10%" y="-10%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000000" flood-opacity="0.4"/>
+    </filter>
+  </defs>
+
+  <!-- iOS rounding app icon background -->
+  <rect width="512" height="512" rx="114" fill="url(#bgGrad)" />
+
+  <!-- The stylized chat bubble -->
+  <path d="M400,256 C400,335.53 335.53,400 256,400 C234.33,400 213.77,395.2 195.3,386.66 
+           C191.07,384.71 186.29,384.34 181.82,385.64 L127,401.62 C115.15,405.07 104.93,394.85 108.38,383 
+           L124.36,328.18 C125.66,323.71 125.29,318.93 123.34,314.7 C114.8,296.23 110,275.67 110,256 
+           C110,176.47 174.47,112 254,112 C333.53,112 400,176.47 400,256 Z" 
+        fill="url(#bubbleGrad)" filter="url(#shadow)" />
+
+  <!-- Inner glowing line / stroke -->
+  <path d="M400,256 C400,335.53 335.53,400 256,400 C234.33,400 213.77,395.2 195.3,386.66 
+           C191.07,384.71 186.29,384.34 181.82,385.64 L127,401.62 C115.15,405.07 104.93,394.85 108.38,383 
+           L124.36,328.18 C125.66,323.71 125.29,318.93 123.34,314.7 C114.8,296.23 110,275.67 110,256 
+           C110,176.47 174.47,112 254,112 C333.53,112 400,176.47 400,256 Z" 
+        fill="none" stroke="#FFFFFF" stroke-opacity="0.3" stroke-width="6" />
+
+  <!-- Center "Cipher" Lock Icon -->
+  <g fill="url(#lockGrad)" transform="translate(186, 171) scale(0.75)">
+    <!-- Lock Shackle -->
+    <path d="M140,80 L140,55.5 C140,24.8 115.2,0 84.5,0 C53.8,0 29,24.8 29,55.5 L29,80 C13,80 0,93 0,109 L0,186 C0,202 13,215 29,215 L140,215 C156,215 169,202 169,186 L169,109 C169,93 156,80 140,80 Z M54,55.5 C54,38.6 67.6,25 84.5,25 C101.4,25 115,38.6 115,55.5 L115,80 L54,80 L54,55.5 Z" />
+    
+    <!-- Shield / Check element inside lock body -->
+    <path d="M84.5,120 C76,120 69.5,126.5 69.5,135 C69.5,140.8 72.8,145.8 77.5,148.5 L73,170 C72.5,173.3 75.3,176 78.5,175.5 L90.5,175.5 C93.7,176 96.5,173.3 96,170 L91.5,148.5 C96.2,145.8 99.5,140.8 99.5,135 C99.5,126.5 93,120 84.5,120 Z" fill="#064E3B" />
+  </g>
+</svg>
