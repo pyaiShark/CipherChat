@@ -5,6 +5,7 @@ export const sendMessage = mutation({
     args: {
         conversationId: v.id("conversations"),
         content: v.string(),
+        audioStorageId: v.optional(v.id("_storage")),
     },
     handler: async (ctx, args) => {
         const identity = await ctx.auth.getUserIdentity();
@@ -21,6 +22,7 @@ export const sendMessage = mutation({
             conversationId: args.conversationId,
             senderId: currentUser._id,
             content: args.content,
+            audioStorageId: args.audioStorageId,
         });
 
         await ctx.db.patch(args.conversationId, {
@@ -70,15 +72,22 @@ export const getMessages = query({
         return Promise.all(
             messages.map(async (msg) => {
                 const sender = await ctx.db.get(msg.senderId);
+                const audioUrl = msg.audioStorageId ? await ctx.storage.getUrl(msg.audioStorageId) : undefined;
+
                 return {
                     ...msg,
                     senderName: sender?.name || "Unknown",
                     senderAvatar: sender?.avatar,
                     isCurrentUserId: sender?._id, // Will match on client
+                    audioUrl,
                 };
             })
         );
     },
+});
+
+export const generateAudioUploadUrl = mutation(async (ctx) => {
+    return await ctx.storage.generateUploadUrl();
 });
 
 export const deleteMessage = mutation({

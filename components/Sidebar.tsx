@@ -201,7 +201,7 @@ export function Sidebar({
                                             )}
                                         </div>
                                         <div className="flex justify-between items-center mt-0.5">
-                                            <p className="text-[13px] text-[var(--wa-text-secondary)] truncate pr-2">
+                                            <p className="text-[13px] text-[var(--wa-text-secondary)] truncate flex-1 min-w-0 pr-2">
                                                 {conv.lastMessage?.content || "No messages yet"}
                                             </p>
                                             {(conv as any).unreadCount > 0 && (

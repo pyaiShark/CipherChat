@@ -13,12 +13,16 @@ import {
     Smile,
     Paperclip,
     Mic,
+    StopCircle,
+    X,
     Users,
     Check,
     CheckCircle2,
     Circle,
     Eye,
     Camera,
+    Play,
+    Pause,
 } from "lucide-react";
 import { formatMessageTimestamp } from "../lib/utils";
 import { Input } from "@shadcn-ui/input";
@@ -32,6 +36,95 @@ import { DpViewer } from "./DpViewer";
 const isOnlyEmojis = (text: string) => /^\p{Emoji_Presentation}+$/u.test(text);
 
 const EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🔥"];
+
+const VoiceMessagePlayer = ({ src, isOwn }: { src: string, isOwn: boolean }) => {
+    const [isPlaying, setIsPlaying] = useState(false);
+    const [progress, setProgress] = useState(0);
+    const audioRef = useRef<HTMLAudioElement>(null);
+    const [duration, setDuration] = useState(0);
+    const [currentTime, setCurrentTime] = useState(0);
+
+    useEffect(() => {
+        const audio = audioRef.current;
+        if (!audio) return;
+
+        const handleTimeUpdate = () => {
+            setCurrentTime(audio.currentTime);
+            setProgress((audio.currentTime / audio.duration) * 100 || 0);
+        };
+        const handleLoadedMetadata = () => {
+            setDuration(audio.duration);
+        };
+        const handleEnded = () => {
+            setIsPlaying(false);
+            setProgress(0);
+            setCurrentTime(0);
+        };
+
+        audio.addEventListener('timeupdate', handleTimeUpdate);
+        audio.addEventListener('loadedmetadata', handleLoadedMetadata);
+        audio.addEventListener('ended', handleEnded);
+
+        return () => {
+            audio.removeEventListener('timeupdate', handleTimeUpdate);
+            audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
+            audio.removeEventListener('ended', handleEnded);
+        };
+    }, []);
+
+    const togglePlay = () => {
+        if (!audioRef.current) return;
+        if (isPlaying) {
+            audioRef.current.pause();
+        } else {
+            audioRef.current.play();
+        }
+        setIsPlaying(!isPlaying);
+    };
+
+    const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!audioRef.current) return;
+        const newTime = (Number(e.target.value) / 100) * audioRef.current.duration;
+        audioRef.current.currentTime = newTime;
+        setProgress(Number(e.target.value));
+    };
+
+    const formatTime = (secs: number) => {
+        if (!secs || isNaN(secs)) return "0:00";
+        const m = Math.floor(secs / 60);
+        const s = Math.floor(secs % 60);
+        return `${m}:${s.toString().padStart(2, '0')}`;
+    };
+
+    return (
+        <div className={`flex items-center gap-1 w-[200px] h-[40px] py-1 px-1 rounded-[14px] shrink-0 ${isOwn ? 'bg-black/5 dark:bg-white/5' : 'bg-black/5 dark:bg-white/5'}`}>
+            <button
+                onClick={(e) => { e.stopPropagation(); togglePlay(); }}
+                className={`w-9 h-9 flex items-center justify-center shrink-0 rounded-full transition-colors ${isOwn ? 'hover:bg-black/10 text-[var(--wa-text-primary)]' : 'hover:bg-black/10 dark:hover:bg-white/10 text-[var(--wa-text-primary)]'}`}
+            >
+                {isPlaying ? <Pause className="w-[18px] h-[18px] fill-current" /> : <Play className="w-[18px] h-[18px] fill-current ml-0.5" />}
+            </button>
+            <div className="flex-1 flex flex-col justify-center px-1">
+                <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={progress || 0}
+                    onChange={(e) => { e.stopPropagation(); handleSeek(e); }}
+                    onClick={(e) => e.stopPropagation()}
+                    className={`w-full h-1 rounded-full appearance-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full cursor-pointer focus:outline-none ${isOwn ? 'bg-black/10 dark:bg-white/10 [&::-webkit-slider-thumb]:bg-[var(--wa-green)]' : 'bg-black/10 dark:bg-white/10 [&::-webkit-slider-thumb]:bg-[#00a884]'}`}
+                />
+                <div className="flex justify-between mt-1 px-0.5 h-3 items-center">
+                    <span className="text-[10px] opacity-75 font-medium tracking-wide">
+                        {isPlaying ? formatTime(currentTime) : formatTime(duration)}
+                    </span>
+                </div>
+            </div>
+            {/* hidden audio tag */}
+            <audio ref={audioRef} src={src} preload="metadata" />
+        </div>
+    );
+};
 
 export function ChatArea({
     conversationId,
@@ -58,6 +151,9 @@ export function ChatArea({
     const generateUploadUrl = useMutation(api.conversations.generateUploadUrl);
     const updateAvatar = useMutation(api.conversations.updateGroupAvatar);
 
+    // Audio Mutaion
+    const generateAudioUploadUrl = useMutation(api.messages.generateAudioUploadUrl);
+
     // Find the other user or group info from conversations
     const currentConv = conversations?.find((c) => c._id === conversationId);
     const isGroup = currentConv?.isGroup;
@@ -81,6 +177,13 @@ export function ChatArea({
     const [showDpOptions, setShowDpOptions] = useState(false);
     const [isUpdatingAvatar, setIsUpdatingAvatar] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // Audio Recording State
+    const [isRecording, setIsRecording] = useState(false);
+    const [recordingTime, setRecordingTime] = useState(0);
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+    const audioChunksRef = useRef<Blob[]>([]);
+    const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
     const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
         const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
@@ -246,6 +349,105 @@ export function ChatArea({
             toast.error("Failed to send message.");
         } finally {
             setIsSending(false);
+        }
+    };
+
+    // --- Audio Recording Handlers ---
+    const formatTime = (seconds: number) => {
+        const m = Math.floor(seconds / 60);
+        const s = seconds % 60;
+        return `${m}:${s.toString().padStart(2, '0')}`;
+    };
+
+    const startRecording = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const mediaRecorder = new MediaRecorder(stream);
+            mediaRecorderRef.current = mediaRecorder;
+            audioChunksRef.current = [];
+
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    audioChunksRef.current.push(event.data);
+                }
+            };
+
+            mediaRecorder.start();
+            setIsRecording(true);
+            setRecordingTime(0);
+
+            timerIntervalRef.current = setInterval(() => {
+                setRecordingTime((prev) => prev + 1);
+            }, 1000);
+        } catch (err) {
+            console.error("Error accessing microphone:", err);
+            toast.error("Microphone access denied or unavailable.");
+        }
+    };
+
+    const stopRecording = () => {
+        if (mediaRecorderRef.current && isRecording) {
+            mediaRecorderRef.current.onstop = async () => {
+                const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+                audioChunksRef.current = []; // Clear current chunks
+                clearInterval(timerIntervalRef.current as NodeJS.Timeout);
+
+                if (recordingTime < 1) {
+                    toast.info("Recording too short");
+                    setIsRecording(false);
+                    return;
+                }
+
+                setIsSending(true);
+                const toastId = toast.loading("Sending voice message...");
+
+                try {
+                    // 1. Get Upload URL
+                    const postUrl = await generateAudioUploadUrl();
+
+                    // 2. Upload Audio Blob
+                    const result = await fetch(postUrl, {
+                        method: "POST",
+                        headers: { "Content-Type": audioBlob.type },
+                        body: audioBlob,
+                    });
+
+                    if (!result.ok) throw new Error("Upload failed");
+                    const { storageId } = await result.json();
+
+                    // 3. Send Message with Audio
+                    await sendMessage({
+                        conversationId,
+                        content: "🎤 Voice Message",
+                        audioStorageId: storageId,
+                    });
+
+                    toast.success("Voice message sent", { id: toastId });
+                } catch (error: any) {
+                    console.error("Failed to send voice message", error);
+                    toast.error(error.message || "Failed to send voice message", { id: toastId });
+                } finally {
+                    setIsSending(false);
+                    setIsRecording(false);
+                    setRecordingTime(0);
+                }
+            };
+            mediaRecorderRef.current.stop();
+            // Stop all tracks to release microphone
+            mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+        }
+    };
+
+    const cancelRecording = () => {
+        if (mediaRecorderRef.current && isRecording) {
+            mediaRecorderRef.current.onstop = () => {
+                audioChunksRef.current = [];
+                setIsRecording(false);
+                setRecordingTime(0);
+                clearInterval(timerIntervalRef.current as NodeJS.Timeout);
+            };
+            mediaRecorderRef.current.stop();
+            mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
         }
     };
 
@@ -484,10 +686,30 @@ export function ChatArea({
                                                     )}
 
                                                     {/* Message content + timestamp row */}
-                                                    <div className={`flex items-end gap-2 ${isOnlyEmoji ? 'mt-1' : ''}`}>
-                                                        <p className={`break-words flex-1 ${isOnlyEmoji ? 'text-5xl leading-none' : 'text-[14.2px] leading-[19px]'}`}>
-                                                            {msg.content}
-                                                        </p>
+                                                    <div className={`flex items-end gap-2 ${(msg as any).audioUrl ? 'mt-2' : isOnlyEmoji ? 'mt-1' : ''}`}>
+                                                        {(msg as any).audioUrl ? (
+                                                            <div className="flex items-center gap-2 mb-1 w-[220px]">
+                                                                <div className="relative shrink-0">
+                                                                    <Avatar className="w-10 h-10 border shadow-sm">
+                                                                        {(msg as any).senderAvatar ? (
+                                                                            <AvatarImage src={(msg as any).senderAvatar} alt="" className="object-cover" />
+                                                                        ) : (
+                                                                            <AvatarFallback className="bg-[var(--wa-input-bg)] text-[var(--wa-text-light)]">
+                                                                                {(msg as any).senderName?.charAt(0).toUpperCase() || "U"}
+                                                                            </AvatarFallback>
+                                                                        )}
+                                                                    </Avatar>
+                                                                    <div className="absolute -bottom-1 -right-1 bg-[var(--wa-green)] rounded-full p-1 z-10 border border-white/20">
+                                                                        <Mic className="w-2.5 h-2.5 text-white" />
+                                                                    </div>
+                                                                </div>
+                                                                <VoiceMessagePlayer src={(msg as any).audioUrl} isOwn={isOwn} />
+                                                            </div>
+                                                        ) : (
+                                                            <p dir="auto" className={`break-words whitespace-pre-wrap flex-1 min-w-0 ${isOnlyEmoji ? 'text-5xl leading-none' : 'text-[14.2px] leading-[19px]'}`}>
+                                                                {msg.content}
+                                                            </p>
+                                                        )}
                                                         <div className="flex items-center gap-1 shrink-0 self-end pb-[1px] mt-1">
                                                             <span className={`text-[11px] ${isOnlyEmoji ? 'opacity-50 drop-shadow-md text-white' : 'text-[var(--wa-text-secondary)]'}`}>
                                                                 {formatMessageTimestamp(msg._creationTime)}
@@ -611,74 +833,119 @@ export function ChatArea({
                 )}
 
                 {/* ── Input Area ── */}
-                <div className="px-3 py-2 bg-[var(--wa-sidebar-header)] shrink-0">
-                    <form onSubmit={handleSend} className="flex items-end gap-2">
-                        {/* Emoji */}
-                        <div className="relative">
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => setShowInputEmojiPicker(!showInputEmojiPicker)}
-                                className={`w-10 h-10 shrink-0 rounded-full transition-colors ${showInputEmojiPicker ? 'bg-[var(--wa-hover)] text-[var(--wa-text-primary)]' : 'text-[var(--wa-text-light)] hover:text-[var(--wa-text-primary)] hover:bg-[var(--wa-hover)]'}`}
-                            >
-                                <Smile className="w-6 h-6" />
-                            </Button>
+                <div className="px-2 pb-2 bg-[var(--wa-sidebar-header)] shrink-0 z-20">
+                    <div className="w-full bg-[var(--wa-input-bg)] rounded-xl flex items-end p-1.5 shadow-sm border border-[var(--wa-border)]/50 gap-1 sm:gap-2 max-w-5xl mx-auto transition-all duration-200 focus-within:ring-1 focus-within:ring-[var(--wa-green)]/30 focus-within:border-[var(--wa-green)]/30">
+                        {isRecording ? (
+                            <div className="flex-1 flex items-center justify-between px-4 h-[44px]">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse" />
+                                    <span className="text-[15px] font-medium text-[var(--wa-text-primary)] font-mono w-12">
+                                        {formatTime(recordingTime)}
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-4 text-[15px] font-medium animate-pulse text-[var(--wa-text-secondary)]">
+                                    Recording...
+                                </div>
+                                <button
+                                    onClick={cancelRecording}
+                                    className="p-2 text-[var(--wa-danger)] hover:bg-[var(--wa-danger)]/10 rounded-full transition-colors flex items-center gap-1 font-medium"
+                                >
+                                    <X className="w-5 h-5" />
+                                    Cancel
+                                </button>
+                            </div>
+                        ) : (
+                            <>
+                                <div className="flex items-center gap-0.5 sm:gap-1 pl-1 shrink-0 relative">
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-10 w-10 md:h-11 md:w-11 rounded-full text-[var(--wa-text-light)] hover:bg-[var(--wa-hover)] transition-colors"
+                                        onClick={() => setShowInputEmojiPicker(!showInputEmojiPicker)}
+                                    >
+                                        <Smile className="w-[26px] h-[26px]" strokeWidth={1.5} />
+                                    </Button>
 
-                            {/* Input Emoji Picker Popup */}
-                            {showInputEmojiPicker && (
-                                <>
-                                    <div
-                                        className="fixed inset-0 z-40"
-                                        onClick={() => setShowInputEmojiPicker(false)}
+                                    {/* Input Emoji Picker Popup */}
+                                    {showInputEmojiPicker && (
+                                        <>
+                                            <div
+                                                className="fixed inset-0 z-40"
+                                                onClick={() => setShowInputEmojiPicker(false)}
+                                            />
+                                            <div className="absolute bottom-full left-0 mb-2 z-50 bg-[var(--wa-header)] rounded-full px-3 py-2 shadow-2xl border border-white/15 flex items-center gap-2 animate-in slide-in-from-bottom-2 duration-200">
+                                                {EMOJIS.map(emoji => (
+                                                    <button
+                                                        key={emoji}
+                                                        type="button"
+                                                        onClick={() => handleSendEmojiDirectly(emoji)}
+                                                        className="text-2xl hover:scale-125 hover:-translate-y-1 transition-all duration-200 cursor-pointer px-1"
+                                                    >
+                                                        {emoji}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </>
+                                    )}
+
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="hidden sm:flex h-11 w-11 rounded-full text-[var(--wa-text-light)] hover:bg-[var(--wa-hover)] transition-colors"
+                                    >
+                                        <Paperclip className="w-[24px] h-[24px]" strokeWidth={1.5} />
+                                    </Button>
+                                </div>
+
+                                <form onSubmit={handleSend} className="flex-1 flex items-end">
+                                    <Input
+                                        value={newMessage}
+                                        onChange={(e) => handleTyping(e.target.value)}
+                                        placeholder="Type a message"
+                                        className="w-full bg-transparent border-none shadow-none text-[15px] px-2 py-3 text-[var(--wa-text-primary)] placeholder:text-[var(--wa-text-light)] placeholder:font-normal focus-visible:ring-0 min-h-[44px] h-[44px]"
                                     />
-                                    <div className="absolute bottom-full left-0 mb-2 z-50 bg-[var(--wa-header)] rounded-full px-3 py-2 shadow-2xl border border-white/15 flex items-center gap-2 animate-in slide-in-from-bottom-2 duration-200">
-                                        {EMOJIS.map(emoji => (
-                                            <button
-                                                key={emoji}
-                                                type="button"
-                                                onClick={() => handleSendEmojiDirectly(emoji)}
-                                                className="text-2xl hover:scale-125 hover:-translate-y-1 transition-all duration-200 cursor-pointer px-1"
-                                            >
-                                                {emoji}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </>
-                            )}
-                        </div>
-                        {/* Text input */}
-                        <div className="flex-1 relative">
-                            <Input
-                                type="text"
-                                value={newMessage}
-                                onChange={(e) => handleTyping(e.target.value)}
-                                placeholder="Type a message"
-                                className="w-full h-[42px] px-4 text-[15px] bg-[var(--wa-input-bg)] text-[var(--wa-text-primary)] rounded-lg border-none shadow-none outline-none placeholder:text-[var(--wa-text-light)] focus-visible:ring-0 focus-visible:border-none"
-                            />
-                        </div>
+                                    <button type="submit" className="hidden" disabled={isSending} />
+                                </form>
+                            </>
+                        )}
 
                         {/* Send / Mic */}
-                        {newMessage.trim() || isSending ? (
-                            <Button
-                                type="submit"
-                                size="icon"
-                                disabled={isSending}
-                                className="w-10 h-10 bg-[var(--wa-green)] rounded-full text-white hover:bg-[var(--wa-green-dark)] active:scale-95 shrink-0 disabled:opacity-70"
-                            >
-                                {isSending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5 ml-0.5" />}
-                            </Button>
-                        ) : (
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="w-10 h-10 shrink-0 rounded-full text-[var(--wa-text-light)] hover:text-[var(--wa-text-primary)] hover:bg-[var(--wa-hover)]"
-                            >
-                                <Mic className="w-6 h-6" />
-                            </Button>
-                        )}
-                    </form>
+                        <div className="shrink-0 flex items-center pr-1 h-full py-0.5">
+                            {newMessage.trim() && !isRecording ? (
+                                <Button
+                                    onClick={handleSend}
+                                    disabled={isSending}
+                                    type="submit"
+                                    size="icon"
+                                    className="h-10 w-10 md:h-11 md:w-11 rounded-full bg-[var(--wa-green)] hover:bg-[#00A884] shadow-sm transform transition-transform text-white"
+                                >
+                                    {isSending ? (
+                                        <Loader2 className="w-5 h-5 animate-spin" />
+                                    ) : (
+                                        <Send className="w-[20px] h-[20px] ml-1" />
+                                    )}
+                                </Button>
+                            ) : isRecording ? (
+                                <Button
+                                    onClick={stopRecording}
+                                    size="icon"
+                                    className="h-10 w-10 md:h-11 md:w-11 rounded-full bg-[var(--wa-green)] hover:bg-[#00A884] shadow-sm text-white overflow-hidden"
+                                >
+                                    <Send className="w-[20px] h-[20px] ml-1 relative z-10" />
+                                </Button>
+                            ) : (
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    type="button"
+                                    onClick={startRecording}
+                                    className="h-10 w-10 md:h-11 md:w-11 rounded-full text-[var(--wa-text-light)] hover:bg-[var(--wa-hover)] focus:bg-[var(--wa-hover)]"
+                                >
+                                    <Mic className="w-6 h-6" />
+                                </Button>
+                            )}
+                        </div>
+                    </div>
                 </div>
             </div>{/* End Main Chat Area */}
 
