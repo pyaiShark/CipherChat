@@ -60,6 +60,7 @@ export function ChatArea({
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const [showScrollButton, setShowScrollButton] = useState(false);
     const [showGroupInfo, setShowGroupInfo] = useState(false);
+    const [showInputEmojiPicker, setShowInputEmojiPicker] = useState(false);
 
     const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
         const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
@@ -133,6 +134,31 @@ export function ChatArea({
             toast.error("Failed to send message. Please check your connection and try again.");
             // Optionally restore the message text so user doesn't lose it
             setNewMessage(content);
+        } finally {
+            setIsSending(false);
+        }
+    };
+
+    const handleSendEmojiDirectly = async (emoji: string) => {
+        setIsSending(true);
+
+        // Mark that user is sending a message right now to force auto-scroll
+        isSendingRef.current = true;
+        if (typingTimeoutRef.current) {
+            clearTimeout(typingTimeoutRef.current);
+            typingTimeoutRef.current = null;
+        }
+        setTyping({ conversationId, isTyping: false }).catch(console.error);
+
+        try {
+            await sendMessage({
+                conversationId,
+                content: emoji,
+            });
+            setShowInputEmojiPicker(false);
+        } catch (error) {
+            console.error("Failed to send emoji", error);
+            toast.error("Failed to send message.");
         } finally {
             setIsSending(false);
         }
@@ -423,14 +449,39 @@ export function ChatArea({
                 <div className="px-3 py-2 bg-[var(--wa-sidebar-header)] shrink-0">
                     <form onSubmit={handleSend} className="flex items-end gap-2">
                         {/* Emoji */}
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="w-10 h-10 shrink-0 rounded-full text-[var(--wa-text-light)] hover:text-[var(--wa-text-primary)] hover:bg-[var(--wa-hover)]"
-                        >
-                            <Smile className="w-6 h-6" />
-                        </Button>
+                        <div className="relative">
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setShowInputEmojiPicker(!showInputEmojiPicker)}
+                                className={`w-10 h-10 shrink-0 rounded-full transition-colors ${showInputEmojiPicker ? 'bg-[var(--wa-hover)] text-[var(--wa-text-primary)]' : 'text-[var(--wa-text-light)] hover:text-[var(--wa-text-primary)] hover:bg-[var(--wa-hover)]'}`}
+                            >
+                                <Smile className="w-6 h-6" />
+                            </Button>
+
+                            {/* Input Emoji Picker Popup */}
+                            {showInputEmojiPicker && (
+                                <>
+                                    <div
+                                        className="fixed inset-0 z-40"
+                                        onClick={() => setShowInputEmojiPicker(false)}
+                                    />
+                                    <div className="absolute bottom-full left-0 mb-2 z-50 bg-[var(--wa-header)] rounded-full px-3 py-2 shadow-2xl border border-white/15 flex items-center gap-2 animate-in slide-in-from-bottom-2 duration-200">
+                                        {EMOJIS.map(emoji => (
+                                            <button
+                                                key={emoji}
+                                                type="button"
+                                                onClick={() => handleSendEmojiDirectly(emoji)}
+                                                className="text-2xl hover:scale-125 hover:-translate-y-1 transition-all duration-200 cursor-pointer px-1"
+                                            >
+                                                {emoji}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </>
+                            )}
+                        </div>
 
                         {/* Attachment */}
                         <Button
