@@ -343,14 +343,14 @@ export function ChatArea({
                                                             e.stopPropagation();
                                                             setReactionsPopupMessageId(reactionsPopupMessageId === msg._id ? null : msg._id);
                                                         }}
-                                                        className={`absolute -top-3 ${isOwn ? 'right-6' : '-right-3'} w-7 h-7 bg-[var(--wa-header)] rounded-full hidden md:flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 shadow-md border hover:bg-[var(--wa-hover)] border-white/10 z-10`}
+                                                        className={`absolute top-1/2 -translate-y-1/2 ${isOwn ? '-left-10' : '-right-10'} w-8 h-8 bg-[var(--wa-header)] rounded-full hidden md:flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 shadow-md border hover:bg-[var(--wa-hover)] border-white/10 z-10`}
                                                     >
-                                                        <Smile className="w-4 h-4 text-[var(--wa-text-light)] relative top-[1px]" />
+                                                        <Smile className="w-5 h-5 text-[var(--wa-text-light)]" />
                                                     </button>
 
                                                     {/* Reaction Picker Popup */}
                                                     {reactionsPopupMessageId === msg._id && (
-                                                        <div className={`absolute top-full mt-2 ${isOwn ? 'right-0' : 'left-0'} bg-[var(--wa-header)] rounded-full px-3 py-2 shadow-xl border border-white/10 flex items-center gap-2 z-20 animate-fade-in-up duration-200`}
+                                                        <div className={`absolute top-1/2 -translate-y-1/2 z-50 bg-[var(--wa-header)] rounded-full px-3 py-2 shadow-2xl border border-white/15 flex items-center gap-2 animate-in zoom-in-95 duration-200 ${isOwn ? 'right-full mr-[0.4rem]' : 'left-full ml-[0.4rem]'}`}
                                                             onMouseLeave={() => setReactionsPopupMessageId(null)}
                                                         >
                                                             {EMOJIS.map(emoji => (
@@ -359,8 +359,9 @@ export function ChatArea({
                                                                     onClick={(e) => {
                                                                         e.stopPropagation();
                                                                         handleReaction(msg._id, emoji);
+                                                                        setReactionsPopupMessageId(null);
                                                                     }}
-                                                                    className="text-2xl hover:scale-125 hover:-translate-y-1 transition-all duration-200 cursor-pointer"
+                                                                    className="text-2xl hover:scale-125 hover:-translate-y-1 transition-all duration-200 cursor-pointer px-1"
                                                                 >
                                                                     {emoji}
                                                                 </button>
@@ -484,5 +485,5 @@ export function ChatArea({
                 />
             )}
         </div>
-);
+    );
 }
