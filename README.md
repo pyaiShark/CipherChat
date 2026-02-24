@@ -73,12 +73,6 @@ npx convex dev
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_YOUR_CLERK_PUBLISHABLE_KEY
 CLERK_SECRET_KEY=sk_test_YOUR_CLERK_SECRET_KEY
 
-# Clerk Redirects
-NEXT_PUBLIC_CLERK_SIGN_IN_URL=/
-NEXT_PUBLIC_CLERK_SIGN_UP_URL=/
-NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/
-NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/
-
 # Convex Production DB (Generated automatically by `npx convex dev`)
 CONVEX_DEPLOYMENT=dev:your-convex-deployment-hash
 NEXT_PUBLIC_CONVEX_URL=https://your-convex-project-hash.convex.cloud
