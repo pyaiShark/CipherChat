@@ -187,7 +187,7 @@ export default function Home() {
 
           {/* Footer */}
           <footer className="relative z-10 text-center text-xs text-[#8696A0]/60 py-5 shrink-0">
-            Built with Next.js, Convex &amp; Clerk
+            © 2026 Goutam Mandal. All rights reserved.
           </footer>
         </div>
       </SignedOut>
