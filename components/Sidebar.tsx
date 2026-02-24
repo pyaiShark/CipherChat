@@ -150,11 +150,15 @@ export function Sidebar({
 
                                     {/* Avatar */}
                                     <div className="relative shrink-0">
-                                        <div><Avatar className="w-12 h-12">
+                                        <Avatar className="w-12 h-12">
                                             {isGroup ? (
-                                                <div className="w-full h-full bg-[#00A884]/20 flex items-center justify-center">
-                                                    <Users className="w-6 h-6 text-[var(--wa-green)]" />
-                                                </div>
+                                                conv.groupAvatar ? (
+                                                    <AvatarImage src={conv.groupAvatar} className="object-cover" />
+                                                ) : (
+                                                    <div className="w-full h-full bg-[#00A884]/20 flex items-center justify-center">
+                                                        <Users className="w-6 h-6 text-[var(--wa-green)]" />
+                                                    </div>
+                                                )
                                             ) : conv.otherUser?.avatar ? (
                                                 <AvatarImage src={conv.otherUser.avatar} alt="" />
                                             ) : null}
@@ -163,12 +167,18 @@ export function Sidebar({
                                                     {conv.otherUser?.name?.charAt(0).toUpperCase() || "?"}
                                                 </AvatarFallback>
                                             )}
-                                        </Avatar></div>
-                                        <div>
-                                            {!isGroup && conv.otherUser?.isOnline && (
-                                                <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-[var(--wa-online)] border-[2.5px] border-[var(--wa-sidebar-bg)] rounded-full animate-online-pulse z-10" />
-                                            )}
-                                        </div>
+                                        </Avatar>
+
+                                        {/* Group tag badge or Online badge */}
+                                        {isGroup ? (
+                                            <div className="absolute -bottom-1 -right-1 bg-[var(--wa-sidebar-bg)] rounded-full p-[2px] z-10 flex items-center justify-center shadow-sm">
+                                                <div className="bg-[var(--wa-green)] text-white rounded-full p-[3px]">
+                                                    <Users className="w-2.5 h-2.5" />
+                                                </div>
+                                            </div>
+                                        ) : conv.otherUser?.isOnline ? (
+                                            <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-[var(--wa-online)] border-[2.5px] border-[var(--wa-sidebar-bg)] rounded-full animate-online-pulse z-10" />
+                                        ) : null}
                                     </div>
 
                                     {/* Info */}
