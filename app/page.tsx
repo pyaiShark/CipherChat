@@ -66,7 +66,7 @@ export default function Home() {
                 <MessageCircle className="w-5 h-5 text-white" />
               </div>
               <span className="font-bold text-lg text-white tracking-tight">
-                ChatSync
+                CipherChat
               </span>
             </div>
             <SignInButton mode="modal">
