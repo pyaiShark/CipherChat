@@ -41,33 +41,6 @@ export const getOrCreateConversation = mutation({
     },
 });
 
-export const markAsRead = mutation({
-    args: {
-        conversationId: v.id("conversations"),
-    },
-    handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) return;
-
-        const currentUser = await ctx.db
-            .query("users")
-            .withIndex("by_clerkId", (q) => q.eq("clerkId", identity.subject))
-            .unique();
-
-        if (!currentUser) return;
-
-        const unreadRecord = await ctx.db
-            .query("unreadCounts")
-            .withIndex("by_user_conversation", (q) =>
-                q.eq("userId", currentUser._id).eq("conversationId", args.conversationId)
-            )
-            .first();
-
-        if (unreadRecord) {
-            await ctx.db.patch(unreadRecord._id, { count: 0 });
-        }
-    },
-});
 
 export const getConversations = query({
     args: {},

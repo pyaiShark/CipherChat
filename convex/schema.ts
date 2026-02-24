@@ -35,6 +35,8 @@ export default defineSchema({
                 })
             )
         ),
+        deliveredTo: v.optional(v.array(v.id("users"))),
+        seenBy: v.optional(v.array(v.id("users"))),
     }).index("by_conversationId", ["conversationId"]),
 
     typingIndicators: defineTable({

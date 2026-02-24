@@ -14,6 +14,9 @@ import {
     Paperclip,
     Mic,
     Users,
+    Check,
+    CheckCircle2,
+    Circle,
 } from "lucide-react";
 import { formatMessageTimestamp } from "../lib/utils";
 import { Input } from "@shadcn-ui/input";
@@ -22,7 +25,10 @@ import { Avatar, AvatarImage, AvatarFallback } from "@shadcn-ui/avatar";
 import { toast } from "sonner";
 import { GroupInfoSidebar } from "./GroupInfoSidebar";
 
-const EMOJIS = ["👍", "❤️", "😂", "😮", "😢"];
+// Utility to check if a string contains ONLY emojis
+const isOnlyEmojis = (text: string) => /^\p{Emoji_Presentation}+$/u.test(text);
+
+const EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🔥"];
 
 export function ChatArea({
     conversationId,
@@ -41,7 +47,8 @@ export function ChatArea({
     const deleteMessage = useMutation(api.messages.deleteMessage);
     const toggleReaction = useMutation(api.messages.toggleReaction);
     const currentUser = useQuery(api.users.getCurrentUser);
-    const markAsRead = useMutation(api.conversations.markAsRead);
+    const markAsRead = useMutation(api.messages.markAsRead);
+    const markAsDelivered = useMutation(api.messages.markAsDelivered);
     const conversations = useQuery(api.conversations.getConversations);
 
     // Find the other user or group info from conversations
@@ -110,8 +117,18 @@ export function ChatArea({
             markAsRead({ conversationId }).catch(console.error);
         }
 
+        // Check for undelivered messages and mark them as delivered
+        if (currentUser && messages) {
+            const undeliveredIds = messages
+                .filter(m => m.senderId !== currentUser._id && !(m.deliveredTo || []).includes(currentUser._id))
+                .map(m => m._id);
+            if (undeliveredIds.length > 0) {
+                markAsDelivered({ messageIds: undeliveredIds }).catch(console.error);
+            }
+        }
+
         return () => clearTimeout(timer);
-    }, [messages?.length, conversationId, markAsRead]);
+    }, [messages?.length, conversationId, markAsRead, markAsDelivered, currentUser]);
 
     const handleSend = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -271,6 +288,18 @@ export function ChatArea({
                                     index === 0 ||
                                     messages[index - 1].senderId !== msg.senderId;
 
+                                // Check if the message is purely emojis
+                                // This regex strips out common emoji ranges and checks if anything is left over besides whitespace
+                                const strippedText = msg.content.replace(/[\p{Emoji}\p{Emoji_Component}\p{Emoji_Modifier}\p{Emoji_Modifier_Base}\p{Emoji_Presentation}\uFE0F\u200D]/gu, '');
+                                const isOnlyEmoji = strippedText.trim().length === 0 && msg.content.trim().length > 0;
+
+                                // Emoji animation classes based on content
+                                let emojiAnimation = "animate-bounce-in";
+                                if (isOnlyEmoji) {
+                                    if (msg.content.includes("❤️")) emojiAnimation = "animate-heartbeat";
+                                    else if (msg.content.includes("🔥")) emojiAnimation = "animate-pulse";
+                                }
+
                                 return (
                                     <div
                                         key={msg._id}
@@ -298,9 +327,11 @@ export function ChatArea({
 
                                                 {/* Main Bubble */}
                                                 <div
-                                                    className={`relative w-full px-3 pt-1.5 pb-1 rounded-lg shadow-sm my-[1px] transition-transform duration-200 z-10 cursor-pointer ${isOwn
-                                                        ? `bg-[var(--wa-bubble-sent)] text-[var(--wa-text-primary)] ${isFirstInGroup ? "bubble-tail-sent rounded-tr-none" : ""}`
-                                                        : `bg-[var(--wa-bubble-received)] text-[var(--wa-text-primary)] ${isFirstInGroup ? "bubble-tail-received rounded-tl-none" : ""}`
+                                                    className={`relative w-full px-3 pt-1.5 pb-1 rounded-lg shadow-sm my-[1px] transition-transform duration-200 z-10 cursor-pointer ${isOnlyEmoji
+                                                        ? `bg-transparent shadow-none text-4xl ${emojiAnimation}` // Big transparent emojis
+                                                        : isOwn
+                                                            ? `bg-[var(--wa-bubble-sent)] text-[var(--wa-text-primary)] ${isFirstInGroup ? "bubble-tail-sent rounded-tr-none px-4 pt-2 pb-1.5 shadow-md" : ""}`
+                                                            : `bg-[var(--wa-bubble-received)] text-[var(--wa-text-primary)] ${isFirstInGroup ? "bubble-tail-received rounded-tl-none px-4 pt-2 pb-1.5 shadow-md" : ""}`
                                                         } ${swipedMessageId === msg._id ? 'translate-x-12' : 'translate-x-0'}`}
                                                     onClick={(e) => {
                                                         // Only toggle reaction picker if not swiped
@@ -332,13 +363,26 @@ export function ChatArea({
                                                     )}
 
                                                     {/* Message content + timestamp row */}
-                                                    <div className="flex items-end gap-2">
-                                                        <p className="text-[14.2px] break-words leading-[19px] flex-1">
+                                                    <div className={`flex items-end gap-2 ${isOnlyEmoji ? 'mt-1' : ''}`}>
+                                                        <p className={`break-words flex-1 ${isOnlyEmoji ? 'text-5xl leading-none' : 'text-[14.2px] leading-[19px]'}`}>
                                                             {msg.content}
                                                         </p>
-                                                        <span className="text-[11px] shrink-0 self-end pb-[1px] text-[var(--wa-text-secondary)]">
-                                                            {formatMessageTimestamp(msg._creationTime)}
-                                                        </span>
+                                                        <div className="flex items-center gap-1 shrink-0 self-end pb-[1px] mt-1">
+                                                            <span className={`text-[11px] ${isOnlyEmoji ? 'opacity-50 drop-shadow-md text-white' : 'text-[var(--wa-text-secondary)]'}`}>
+                                                                {formatMessageTimestamp(msg._creationTime)}
+                                                            </span>
+                                                            {isOwn && (
+                                                                <span className="shrink-0 text-[var(--wa-text-secondary)] flex items-center justify-center">
+                                                                    {!isGroup && msg.seenBy && msg.seenBy.length > 0 ? (
+                                                                        <div className="w-[18px] h-[18px] rounded-full border-[1.5px] border-[#34B7F1] flex shrink-0 items-center justify-center bg-transparent">
+                                                                            <div className="w-[10px] h-[10px] rounded-full bg-[#34B7F1]" />
+                                                                        </div>
+                                                                    ) : (
+                                                                        <div className="w-[18px] h-[18px] rounded-full border-[1.5px] border-gray-400 opacity-70 shrink-0 bg-transparent" />
+                                                                    )}
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                     </div>
 
                                                     {/* Display Reactions */}
@@ -482,17 +526,6 @@ export function ChatArea({
                                 </>
                             )}
                         </div>
-
-                        {/* Attachment */}
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="w-10 h-10 shrink-0 rounded-full text-[var(--wa-text-light)] hover:text-[var(--wa-text-primary)] hover:bg-[var(--wa-hover)]"
-                        >
-                            <Paperclip className="w-5 h-5 rotate-45" />
-                        </Button>
-
                         {/* Text input */}
                         <div className="flex-1 relative">
                             <Input

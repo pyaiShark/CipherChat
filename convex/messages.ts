@@ -158,3 +158,92 @@ export const toggleReaction = mutation({
         });
     },
 });
+
+export const markAsDelivered = mutation({
+    args: {
+        messageIds: v.array(v.id("messages")),
+    },
+    handler: async (ctx, args) => {
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) return;
+
+        const currentUser = await ctx.db
+            .query("users")
+            .withIndex("by_clerkId", (q) => q.eq("clerkId", identity.subject))
+            .unique();
+
+        if (!currentUser) return;
+
+        for (const messageId of args.messageIds) {
+            const message = await ctx.db.get(messageId);
+            if (!message || message.senderId === currentUser._id) continue;
+
+            const currentDeliveredTo = message.deliveredTo || [];
+            if (!currentDeliveredTo.includes(currentUser._id)) {
+                await ctx.db.patch(messageId, {
+                    deliveredTo: [...currentDeliveredTo, currentUser._id],
+                });
+            }
+        }
+    },
+});
+
+export const markAsRead = mutation({
+    args: {
+        conversationId: v.id("conversations"),
+    },
+    handler: async (ctx, args) => {
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) return;
+
+        const currentUser = await ctx.db
+            .query("users")
+            .withIndex("by_clerkId", (q) => q.eq("clerkId", identity.subject))
+            .unique();
+
+        if (!currentUser) return;
+
+        // Reset unread count for the current user in this conversation
+        const unreadRecord = await ctx.db
+            .query("unreadCounts")
+            .withIndex("by_user_conversation", (q) =>
+                q.eq("userId", currentUser._id).eq("conversationId", args.conversationId)
+            )
+            .first();
+
+        if (unreadRecord && unreadRecord.count > 0) {
+            await ctx.db.patch(unreadRecord._id, { count: 0 });
+        }
+
+        // Find all messages in this conversation not sent by the current user
+        const messages = await ctx.db
+            .query("messages")
+            .withIndex("by_conversationId", (q) => q.eq("conversationId", args.conversationId))
+            .collect();
+
+        for (const message of messages) {
+            if (message.senderId !== currentUser._id) {
+                const currentSeenBy = message.seenBy || [];
+                const currentDeliveredTo = message.deliveredTo || [];
+
+                let needsPatch = false;
+                let patchData: { seenBy?: any; deliveredTo?: any } = {};
+
+                if (!currentSeenBy.includes(currentUser._id)) {
+                    patchData.seenBy = [...currentSeenBy, currentUser._id];
+                    needsPatch = true;
+                }
+
+                // If it's read, it's also implicitly delivered
+                if (!currentDeliveredTo.includes(currentUser._id)) {
+                    patchData.deliveredTo = [...currentDeliveredTo, currentUser._id];
+                    needsPatch = true;
+                }
+
+                if (needsPatch) {
+                    await ctx.db.patch(message._id, patchData);
+                }
+            }
+        }
+    },
+});
