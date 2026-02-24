@@ -9,7 +9,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@shadcn-ui/avatar";
 import { Button } from "@shadcn-ui/button";
 import { ScrollArea } from "@shadcn-ui/scroll-area";
 import { toast } from "sonner";
-import { Input } from "@shadcn-ui/input";
+import { useRef } from "react";
 
 export function GroupInfoSidebar({
     conversationId,
@@ -19,13 +19,13 @@ export function GroupInfoSidebar({
     onClose: () => void;
 }) {
     const [isUpdatingAvatar, setIsUpdatingAvatar] = useState(false);
-    const [avatarUrlInput, setAvatarUrlInput] = useState("");
-    const [showAvatarInput, setShowAvatarInput] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Queries
     const currentUser = useQuery(api.users.getCurrentUser);
     const conversations = useQuery(api.conversations.getConversations);
     const members = useQuery(api.conversations.getGroupMembers, { conversationId });
+    const generateUploadUrl = useMutation(api.conversations.generateUploadUrl);
     const updateAvatar = useMutation(api.conversations.updateGroupAvatar);
 
     // Get current group details
@@ -35,23 +35,43 @@ export function GroupInfoSidebar({
 
     const isAdmin = currentUser?._id === group.adminId;
 
-    const handleUpdateAvatar = async () => {
-        if (!avatarUrlInput.trim()) return;
+    const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        if (!file.type.startsWith("image/")) {
+            toast.error("Please select an image file");
+            return;
+        }
 
         setIsUpdatingAvatar(true);
         try {
+            // 1. Get uploading URL
+            const postUrl = await generateUploadUrl();
+
+            // 2. Upload the file
+            const result = await fetch(postUrl, {
+                method: "POST",
+                headers: { "Content-Type": file.type },
+                body: file,
+            });
+
+            if (!result.ok) throw new Error("Upload failed");
+
+            const { storageId } = await result.json();
+
+            // 3. Update the conversation with the new storageId
             await updateAvatar({
                 conversationId,
-                avatarUrl: avatarUrlInput.trim(),
+                storageId,
             });
             toast.success("Group avatar updated");
-            setShowAvatarInput(false);
         } catch (error: any) {
             console.error("Failed to update avatar", error);
             toast.error(error.message || "Failed to update avatar");
         } finally {
             setIsUpdatingAvatar(false);
-            setAvatarUrlInput("");
+            if (fileInputRef.current) fileInputRef.current.value = "";
         }
     };
 
@@ -88,35 +108,30 @@ export function GroupInfoSidebar({
 
                         {/* Admin Avatar Overlay */}
                         {isAdmin && (
-                            <div
-                                onClick={() => setShowAvatarInput(!showAvatarInput)}
-                                className="absolute inset-0 bg-black/40 rounded-full flex flex-col items-center justify-center opacity-0 group-hover/avatar:opacity-100 transition-opacity duration-200"
-                            >
-                                <Camera className="w-8 h-8 text-white mb-2" />
-                                <span className="text-white text-xs font-medium uppercase tracking-wider">Change DP</span>
-                            </div>
+                            <>
+                                <input
+                                    type="file"
+                                    ref={fileInputRef}
+                                    onChange={handleImageChange}
+                                    accept="image/*"
+                                    className="hidden"
+                                />
+                                <div
+                                    onClick={() => !isUpdatingAvatar && fileInputRef.current?.click()}
+                                    className={`absolute inset-0 bg-black/40 rounded-full flex flex-col items-center justify-center transition-opacity duration-200 ${isUpdatingAvatar ? 'opacity-100 cursor-wait' : 'opacity-0 group-hover/avatar:opacity-100 cursor-pointer'}`}
+                                >
+                                    {isUpdatingAvatar ? (
+                                        <Loader2 className="w-8 h-8 text-white animate-spin" />
+                                    ) : (
+                                        <>
+                                            <Camera className="w-8 h-8 text-white mb-2" />
+                                            <span className="text-white text-xs font-medium uppercase tracking-wider">Change DP</span>
+                                        </>
+                                    )}
+                                </div>
+                            </>
                         )}
                     </div>
-
-                    {showAvatarInput && isAdmin && (
-                        <div className="w-full bg-[var(--wa-hover)] rounded-xl p-3 mb-4 animate-in fade-in zoom-in-95 duration-200 border border-[var(--wa-border)]">
-                            <p className="text-xs text-[var(--wa-text-secondary)] mb-2 uppercase font-medium tracking-wide">Enter Image URL</p>
-                            <div className="flex flex-col gap-2">
-                                <Input
-                                    placeholder="https://..."
-                                    className="h-9 text-sm bg-[var(--wa-input-bg)] border-none focus-visible:ring-1 focus-visible:ring-[var(--wa-green)]"
-                                    value={avatarUrlInput}
-                                    onChange={(e) => setAvatarUrlInput(e.target.value)}
-                                />
-                                <div className="flex gap-2 justify-end">
-                                    <Button variant="ghost" size="sm" onClick={() => setShowAvatarInput(false)} className="h-8 text-xs hover:bg-[var(--wa-input-bg)]">Cancel</Button>
-                                    <Button size="sm" onClick={handleUpdateAvatar} disabled={isUpdatingAvatar || !avatarUrlInput.trim()} className="h-8 text-xs bg-[var(--wa-green)] hover:bg-[var(--wa-green-dark)] text-white">
-                                        {isUpdatingAvatar ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
-                                    </Button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
 
                     <h1 className="text-2xl font-bold text-[var(--wa-text-primary)] tracking-tight mb-1 text-center">
                         {group.groupName}

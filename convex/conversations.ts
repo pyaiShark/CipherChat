@@ -196,7 +196,7 @@ export const getGroupMembers = query({
 export const updateGroupAvatar = mutation({
     args: {
         conversationId: v.id("conversations"),
-        avatarUrl: v.string(),
+        storageId: v.id("_storage"),
     },
     handler: async (ctx, args) => {
         const identity = await ctx.auth.getUserIdentity();
@@ -217,10 +217,17 @@ export const updateGroupAvatar = mutation({
             throw new Error("Only the group admin can update the avatar");
         }
 
+        const avatarUrl = await ctx.storage.getUrl(args.storageId);
+        if (!avatarUrl) throw new Error("Failed to get image URL");
+
         await ctx.db.patch(args.conversationId, {
-            groupAvatar: args.avatarUrl,
+            groupAvatar: avatarUrl,
         });
 
         return true;
     },
+});
+
+export const generateUploadUrl = mutation(async (ctx) => {
+    return await ctx.storage.generateUploadUrl();
 });
