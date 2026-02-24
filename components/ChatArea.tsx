@@ -888,13 +888,7 @@ export function ChatArea({
                                         </>
                                     )}
 
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="hidden sm:flex h-11 w-11 rounded-full text-[var(--wa-text-light)] hover:bg-[var(--wa-hover)] transition-colors"
-                                    >
-                                        <Paperclip className="w-[24px] h-[24px]" strokeWidth={1.5} />
-                                    </Button>
+                                    {/* Removed paperclip button */}
                                 </div>
 
                                 <form onSubmit={handleSend} className="flex-1 flex items-end">
