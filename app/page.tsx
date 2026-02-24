@@ -41,6 +41,10 @@ export default function Home() {
     }
   };
 
+  const handleSelectConversation = (convId: Id<"conversations">) => {
+    setActiveConversationId(convId);
+  };
+
   return (
     <div className="h-screen w-full flex flex-col bg-[var(--wa-bg)] overflow-hidden">
       <SignedOut>
@@ -202,6 +206,7 @@ export default function Home() {
             >
               <Sidebar
                 onSelectUser={handleSelectUser}
+                onSelectConversation={handleSelectConversation}
                 activeConversationId={activeConversationId}
               />
             </div>

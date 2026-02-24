@@ -16,6 +16,10 @@ export default defineSchema({
         participantIds: v.array(v.id("users")),
         lastMessageId: v.optional(v.id("messages")),
         updatedAt: v.number(),
+        isGroup: v.optional(v.boolean()),
+        groupName: v.optional(v.string()),
+        groupAvatar: v.optional(v.string()),
+        adminId: v.optional(v.id("users")),
     }),
 
     messages: defineTable({

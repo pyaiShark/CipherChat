@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../convex/_generated/api";
-import { Search, Loader2, X, MessageCircle, Plus } from "lucide-react";
+import { Search, Loader2, X, MessageCircle, Plus, Users } from "lucide-react";
 import Image from "next/image";
 import { formatMessageTimestamp } from "../lib/utils";
 import { UserButton } from "@clerk/nextjs";
@@ -14,16 +14,20 @@ import { ScrollArea } from "@shadcn-ui/scroll-area";
 import { Avatar, AvatarImage, AvatarFallback } from "@shadcn-ui/avatar";
 import { Button } from "@shadcn-ui/button";
 import { ThemeToggle } from "./ThemeToggle";
+import { CreateGroupModal } from "./CreateGroupModal";
 
 export function Sidebar({
     onSelectUser,
+    onSelectConversation,
     activeConversationId,
 }: {
     onSelectUser: (userId: string) => void;
+    onSelectConversation: (convId: Id<"conversations">) => void;
     activeConversationId: Id<"conversations"> | null;
 }) {
     const [searchQuery, setSearchQuery] = useState("");
     const [searchFocused, setSearchFocused] = useState(false);
+    const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
     const users = useQuery(api.users.getUsers);
     const conversations = useQuery(api.conversations.getConversations);
 
@@ -60,7 +64,7 @@ export function Sidebar({
             </div>
 
             {/* ── Search ── */}
-            <div className="px-4 py-2.5 shrink-0">
+            <div className="px-4 py-2.5 shrink-0 flex flex-col gap-2">
                 <div
                     className={`relative flex items-center rounded-lg transition-all duration-200 bg-[var(--wa-input-bg)] ${searchFocused ? "ring-1 ring-[var(--wa-search-ring)]/40" : ""
                         }`}
@@ -90,6 +94,18 @@ export function Sidebar({
                         </button>
                     )}
                 </div>
+                {!searchFocused && searchQuery.trim() === "" && (
+                    <Button
+                        variant="ghost"
+                        className="w-full justify-start text-[var(--wa-text-primary)] hover:bg-[var(--wa-hover)] px-2 py-1 h-10"
+                        onClick={() => setIsCreateGroupOpen(true)}
+                    >
+                        <div className="w-8 h-8 rounded-full bg-[var(--wa-green)] flex items-center justify-center mr-3">
+                            <Users className="w-4 h-4 text-white" />
+                        </div>
+                        <span className="font-medium text-[15px]">New Group</span>
+                    </Button>
+                )}
             </div>
 
             {/* ── List ── */}
@@ -115,12 +131,13 @@ export function Sidebar({
                     ) : (
                         conversations.map((conv) => {
                             const isActive = activeConversationId === conv._id;
+                            const isGroup = conv.isGroup;
+                            const groupName = conv.groupName;
+
                             return (
                                 <button
                                     key={conv._id}
-                                    onClick={() =>
-                                        conv.otherUser && onSelectUser(conv.otherUser._id)
-                                    }
+                                    onClick={() => onSelectConversation(conv._id)}
                                     className={`w-full flex items-center gap-3 px-4 py-3.5 transition-all duration-150 text-left relative group ${isActive
                                         ? "bg-[var(--wa-hover)]"
                                         : "hover:bg-[var(--wa-hover)]"
@@ -134,15 +151,21 @@ export function Sidebar({
                                     {/* Avatar */}
                                     <div className="relative shrink-0">
                                         <div><Avatar className="w-12 h-12">
-                                            {conv.otherUser?.avatar ? (
+                                            {isGroup ? (
+                                                <div className="w-full h-full bg-[#00A884]/20 flex items-center justify-center">
+                                                    <Users className="w-6 h-6 text-[var(--wa-green)]" />
+                                                </div>
+                                            ) : conv.otherUser?.avatar ? (
                                                 <AvatarImage src={conv.otherUser.avatar} alt="" />
                                             ) : null}
-                                            <AvatarFallback className="bg-[var(--wa-input-bg)] text-base font-semibold text-[var(--wa-text-light)]">
-                                                {conv.otherUser?.name?.charAt(0).toUpperCase() || "?"}
-                                            </AvatarFallback>
+                                            {!isGroup && (
+                                                <AvatarFallback className="bg-[var(--wa-input-bg)] text-base font-semibold text-[var(--wa-text-light)]">
+                                                    {conv.otherUser?.name?.charAt(0).toUpperCase() || "?"}
+                                                </AvatarFallback>
+                                            )}
                                         </Avatar></div>
                                         <div>
-                                            {conv.otherUser?.isOnline && (
+                                            {!isGroup && conv.otherUser?.isOnline && (
                                                 <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-[var(--wa-online)] border-[2.5px] border-[var(--wa-sidebar-bg)] rounded-full animate-online-pulse z-10" />
                                             )}
                                         </div>
@@ -152,7 +175,7 @@ export function Sidebar({
                                     <div className="flex-1 min-w-0 border-b border-[var(--wa-border)]/40 pb-3">
                                         <div className="flex justify-between items-baseline">
                                             <span className="text-[15px] font-medium text-[var(--wa-text-primary)] truncate">
-                                                {conv.otherUser?.name}
+                                                {isGroup ? groupName : conv.otherUser?.name}
                                             </span>
                                             {conv.lastMessage && (
                                                 <span
@@ -246,6 +269,15 @@ export function Sidebar({
                     )
                 )}
             </ScrollArea>
+            <CreateGroupModal
+                isOpen={isCreateGroupOpen}
+                onClose={() => setIsCreateGroupOpen(false)}
+                onGroupCreated={(convId) => {
+                    onSelectConversation(convId);
+                    setSearchFocused(false);
+                    setSearchQuery("");
+                }}
+            />
         </div>
     );
 }
