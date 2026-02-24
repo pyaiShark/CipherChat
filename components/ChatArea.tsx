@@ -17,6 +17,8 @@ import {
     Check,
     CheckCircle2,
     Circle,
+    Eye,
+    Camera,
 } from "lucide-react";
 import { formatMessageTimestamp } from "../lib/utils";
 import { Input } from "@shadcn-ui/input";
@@ -24,6 +26,7 @@ import { Button } from "@shadcn-ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@shadcn-ui/avatar";
 import { toast } from "sonner";
 import { GroupInfoSidebar } from "./GroupInfoSidebar";
+import { DpViewer } from "./DpViewer";
 
 // Utility to check if a string contains ONLY emojis
 const isOnlyEmojis = (text: string) => /^\p{Emoji_Presentation}+$/u.test(text);
@@ -51,6 +54,10 @@ export function ChatArea({
     const markAsDelivered = useMutation(api.messages.markAsDelivered);
     const conversations = useQuery(api.conversations.getConversations);
 
+    // DP Update Mutations
+    const generateUploadUrl = useMutation(api.conversations.generateUploadUrl);
+    const updateAvatar = useMutation(api.conversations.updateGroupAvatar);
+
     // Find the other user or group info from conversations
     const currentConv = conversations?.find((c) => c._id === conversationId);
     const isGroup = currentConv?.isGroup;
@@ -68,6 +75,12 @@ export function ChatArea({
     const [showScrollButton, setShowScrollButton] = useState(false);
     const [showGroupInfo, setShowGroupInfo] = useState(false);
     const [showInputEmojiPicker, setShowInputEmojiPicker] = useState(false);
+
+    // DP Viewer and Updater State
+    const [viewingDpUrl, setViewingDpUrl] = useState<string | null>(null);
+    const [showDpOptions, setShowDpOptions] = useState(false);
+    const [isUpdatingAvatar, setIsUpdatingAvatar] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
         const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
@@ -139,23 +152,78 @@ export function ChatArea({
 
         // Mark that user is sending a message right now to force auto-scroll
         isSendingRef.current = true;
+
         if (typingTimeoutRef.current) {
             clearTimeout(typingTimeoutRef.current);
             typingTimeoutRef.current = null;
         }
         setTyping({ conversationId, isTyping: false }).catch(console.error);
+
         try {
             await sendMessage({ conversationId, content });
         } catch (error) {
             console.error("Failed to send message", error);
             toast.error("Failed to send message. Please check your connection and try again.");
-            // Optionally restore the message text so user doesn't lose it
             setNewMessage(content);
         } finally {
             setIsSending(false);
         }
     };
 
+    const handleAvatarClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        const avatarUrl = isGroup ? currentConv?.groupAvatar : otherUser?.avatar;
+
+        if (isGroup && currentConv?.adminId === currentUser?._id) {
+            // Admin of group gets options to view or update
+            setShowDpOptions(true);
+        } else if (avatarUrl) {
+            // Non-admin or 1-on-1 chat, just view if there is an avatar
+            setViewingDpUrl(avatarUrl);
+        } else if (!isGroup) {
+            toast.info("This user has no profile picture.");
+        }
+    };
+
+    const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        if (!file.type.startsWith("image/")) {
+            toast.error("Please select an image file");
+            return;
+        }
+
+        setIsUpdatingAvatar(true);
+        setShowDpOptions(false); // Close dropdown while updating
+
+        const toastId = toast.loading("Updating group icon...");
+
+        try {
+            const postUrl = await generateUploadUrl();
+            const result = await fetch(postUrl, {
+                method: "POST",
+                headers: { "Content-Type": file.type },
+                body: file,
+            });
+
+            if (!result.ok) throw new Error("Upload failed");
+
+            const { storageId } = await result.json();
+
+            await updateAvatar({
+                conversationId,
+                storageId,
+            });
+            toast.success("Group avatar updated", { id: toastId });
+        } catch (error: any) {
+            console.error("Failed to update avatar", error);
+            toast.error(error.message || "Failed to update avatar", { id: toastId });
+        } finally {
+            setIsUpdatingAvatar(false);
+            if (fileInputRef.current) fileInputRef.current.value = "";
+        }
+    };
     const handleSendEmojiDirectly = async (emoji: string) => {
         setIsSending(true);
 
@@ -224,24 +292,76 @@ export function ChatArea({
                         </Button>
 
                         {/* User avatar */}
-                        <Avatar className="w-10 h-10">
-                            {isGroup ? (
-                                groupName === currentConv?.groupName && currentConv.groupAvatar ? (
-                                    <AvatarImage src={currentConv.groupAvatar} className="object-cover" />
-                                ) : (
-                                    <div className="w-full h-full bg-[#00A884]/20 flex items-center justify-center">
-                                        <Users className="w-5 h-5 text-[var(--wa-green)]" />
-                                    </div>
-                                )
-                            ) : otherUser?.avatar ? (
-                                <AvatarImage src={otherUser.avatar} alt="" />
-                            ) : null}
-                            {!isGroup && (
-                                <AvatarFallback className="bg-[var(--wa-input-bg)] text-sm font-semibold text-[var(--wa-text-light)]">
-                                    {otherUser?.name?.charAt(0).toUpperCase() || "C"}
-                                </AvatarFallback>
+                        <div className="relative">
+                            <Avatar
+                                className="w-10 h-10 cursor-pointer transition-transform hover:scale-105"
+                                onClick={handleAvatarClick}
+                            >
+                                {isGroup ? (
+                                    groupName === currentConv?.groupName && currentConv.groupAvatar ? (
+                                        <AvatarImage src={currentConv.groupAvatar} className="object-cover" />
+                                    ) : (
+                                        <div className="w-full h-full bg-[#00A884]/20 flex items-center justify-center">
+                                            <Users className="w-5 h-5 text-[var(--wa-green)]" />
+                                        </div>
+                                    )
+                                ) : otherUser?.avatar ? (
+                                    <AvatarImage src={otherUser.avatar} alt="" />
+                                ) : null}
+                                {!isGroup && (
+                                    <AvatarFallback className="bg-[var(--wa-input-bg)] text-sm font-semibold text-[var(--wa-text-light)]">
+                                        {otherUser?.name?.charAt(0).toUpperCase() || "C"}
+                                    </AvatarFallback>
+                                )}
+                            </Avatar>
+
+                            {/* Group DP Options Menu */}
+                            {showDpOptions && (
+                                <div className="absolute top-12 left-0 w-48 bg-[var(--wa-sidebar-bg)] border border-[var(--wa-border)] shadow-xl rounded-lg py-1 z-50 animate-in fade-in zoom-in-95 duration-150">
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setShowDpOptions(false);
+                                            if (currentConv?.groupAvatar) {
+                                                setViewingDpUrl(currentConv.groupAvatar);
+                                            } else {
+                                                toast.info("This group has no custom picture.");
+                                            }
+                                        }}
+                                        className="w-full px-4 py-3 text-left flex items-center gap-3 hover:bg-[var(--wa-hover)] transition-colors text-[14.2px] text-[var(--wa-text-primary)]"
+                                    >
+                                        <Eye className="w-4 h-4 text-[var(--wa-text-secondary)]" />
+                                        View DP
+                                    </button>
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (!isUpdatingAvatar && fileInputRef.current) {
+                                                fileInputRef.current.click();
+                                            }
+                                        }}
+                                        disabled={isUpdatingAvatar}
+                                        className="w-full px-4 py-3 text-left flex items-center gap-3 hover:bg-[var(--wa-hover)] transition-colors text-[14.2px] text-[var(--wa-text-primary)] disabled:opacity-50 disabled:cursor-wait"
+                                    >
+                                        {isUpdatingAvatar ? (
+                                            <Loader2 className="w-4 h-4 text-[var(--wa-text-secondary)] animate-spin" />
+                                        ) : (
+                                            <Camera className="w-4 h-4 text-[var(--wa-text-secondary)]" />
+                                        )}
+                                        {isUpdatingAvatar ? "Updating..." : "Update DP"}
+                                    </button>
+                                </div>
                             )}
-                        </Avatar>
+
+                            {/* Hidden File Input for Avatar Upload */}
+                            <input
+                                type="file"
+                                ref={fileInputRef}
+                                onChange={handleImageChange}
+                                accept="image/*"
+                                className="hidden"
+                            />
+                        </div>
 
                         {/* Name & status */}
                         <div className="min-w-0">
@@ -252,10 +372,11 @@ export function ChatArea({
                                 <p className="text-xs text-[var(--wa-green-light)] font-medium">typing...</p>
                             ) : isGroup ? (
                                 <p className="text-xs text-[var(--wa-text-on-header)]/70">{participantCount} members</p>
-                            ) : otherUser?.isOnline ? (
-                                <p className="text-xs text-[var(--wa-text-on-header)]/70">online</p>
                             ) : (
-                                <p className="text-xs text-[var(--wa-text-on-header)]/70">offline</p>
+                                <p className="text-xs text-[var(--wa-text-on-header)]/70 truncate">
+                                    {otherUser?.isOnline ? "online" : "offline"}
+                                    {otherUser?.username && <span className="opacity-75 relative -top-[0.5px]"> • @{otherUser.username}</span>}
+                                </p>
                             )}
                         </div>
                     </div>
@@ -566,6 +687,13 @@ export function ChatArea({
                 <GroupInfoSidebar
                     conversationId={conversationId}
                     onClose={() => setShowGroupInfo(false)}
+                />
+            )}
+            {/* DP Viewer Modal */}
+            {viewingDpUrl && (
+                <DpViewer
+                    imageUrl={viewingDpUrl}
+                    onClose={() => setViewingDpUrl(null)}
                 />
             )}
         </div>
