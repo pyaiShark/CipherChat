@@ -39,6 +39,11 @@ export function Sidebar({
         );
     });
 
+    const truncateText = (text: string, maxLength: number) => {
+        if (!text) return "";
+        return text.length > maxLength ? text.substring(0, maxLength) + "..." : text;
+    };
+
     return (
         <div className="flex flex-col h-full bg-[var(--wa-sidebar-bg)] border-r border-[var(--wa-border)]">
             {/* ── Header ── */}
@@ -200,9 +205,9 @@ export function Sidebar({
                                                 </span>
                                             )}
                                         </div>
-                                        <div className="flex justify-between items-center mt-0.5">
-                                            <p className="text-[13px] text-[var(--wa-text-secondary)] truncate flex-1 min-w-0 pr-2">
-                                                {conv.lastMessage?.content || "No messages yet"}
+                                        <div className="flex justify-between items-center mt-0.5 whitespace-nowrap overflow-hidden">
+                                            <p className="text-[13px] text-[var(--wa-text-secondary)] flex-1 pr-2 text-left">
+                                                {truncateText(conv.lastMessage?.content || "No messages yet", 42)}
                                             </p>
                                             {(conv as any).unreadCount > 0 && (
                                                 <Badge className="ml-2 bg-[var(--wa-unread-badge)] text-white text-[11px] font-bold min-w-[20px] h-5 px-1.5 shrink-0 border-none hover:bg-[var(--wa-unread-badge)]">
